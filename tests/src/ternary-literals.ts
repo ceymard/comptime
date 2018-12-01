@@ -1,2 +1,2 @@
 
-export const TEST = comptime.debug ? 'DEBUG' : 'PROD'
+export const TEST = Comptime.Debug ? 'DEBUG' : 'PROD'

@@ -1,12 +1,16 @@
 
-declare namespace comptime {
+declare namespace Comptime {
 
-  export const env: {[name: string]: string | undefined}
+  export const Env: {[name: string]: string | undefined}
 
-  export const pkg: {
+  export const Pkg: {
     version: string
     name: string
     [name: string]: any
   }
+
+  export const Debug: boolean
+  export const Dev: boolean
+  export const Production: boolean
 
 }

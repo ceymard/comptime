@@ -1,2 +1,2 @@
 
-export const val = comptime.test(2)
+export const val = Comptime.Test(2)

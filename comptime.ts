@@ -8,11 +8,25 @@ const K = ts.SyntaxKind
 const DECL_FILE = path.join(__dirname, 'index.ts')
 const DECL_FILEDTS = path.join(__dirname, 'index.d.ts')
 
-const comptime = {
-  env: {},
-  pkg: {}
+const Comptime = {
+  Env: {},
+  Pkg: {},
+  Production: true,
+  Dev: false,
+  Debug: false
 }
-Object.assign(comptime.env, process.env)
+Object.assign(Comptime.Env, process.env)
+
+if (process.env.COMPTIME_ENV === 'dev') {
+  Comptime.Dev = true
+  Comptime.Production = false
+}
+
+if (!!process.env.DEBUG) {
+  Comptime.Production = false
+  Comptime.Dev = true
+  Comptime.Debug = true
+}
 
 export interface PluginOptions {
 
@@ -40,11 +54,11 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
    */
   function evalExp(node: ts.Node) {
 
-    (comptime.pkg as any) = pkg
+    (Comptime.Pkg as any) = pkg
     const opts = Object.assign({}, ctx.getCompilerOptions(), {noImplicitUseString: true})
     var t = ts.transpile(node.getText(), opts).replace(/"use strict";\s*\n?/, '');
     try {
-      var res = se(t, { comptime })
+      var res = se(t, { Comptime })
     } catch (e) {
       console.log(`comptime error in ${src.fileName}:${node.pos}`)
       throw e
@@ -129,7 +143,7 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
       const sym = type.getSymbol()
       if (sym && sym.declarations.length > 0) {
         const f = sym.declarations[0].getSourceFile().fileName
-        if (expr.text === 'comptime' && (f === DECL_FILE || f === DECL_FILEDTS)) {
+        if (expr.text === 'Comptime' && (f === DECL_FILE || f === DECL_FILEDTS)) {
           return true
         }
       }
