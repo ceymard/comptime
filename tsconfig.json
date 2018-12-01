@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "declaration": true,
+    "sourceMap": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "outDir": ".",
+    "rootDir": ".",
+    "noStrictGenericChecks": true,
+    "experimentalDecorators": true,
+    "lib": ["es6"]
+  },
+  "exclude": ["__dist__", "__build__"]
+}
+
