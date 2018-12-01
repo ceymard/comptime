@@ -86,6 +86,8 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
     if (ts.isLiteralExpression(expr)
       || ts.isFunctionExpression(expr)
       || ts.isArrowFunction(expr)
+      || ts.isObjectLiteralElement(expr)
+      || ts.isArrayLiteralExpression(expr)
       || expr.kind === K.TrueKeyword
       || expr.kind === K.FalseKeyword
       || expr.kind === K.UndefinedKeyword
