@@ -1,15 +1,18 @@
 
 import * as ts from 'typescript'
-
-import * as cmp from './index'
 import * as path from 'path'
 import * as finder from 'find-package-json'
 const se = require('safe-eval')
 
+const K = ts.SyntaxKind
 const DECL_FILE = path.join(__dirname, 'index.ts')
 const DECL_FILEDTS = path.join(__dirname, 'index.d.ts')
 
-Object.assign(cmp.comptime.env, process.env)
+const comptime = {
+  env: {},
+  pkg: {}
+}
+Object.assign(comptime.env, process.env)
 
 export interface PluginOptions {
 
@@ -46,7 +49,11 @@ function expressionIsComptime(expr: ts.Node, chk: ts.TypeChecker): boolean {
     return expressionIsComptime(expr.left, chk) && expressionIsComptime(expr.right, chk)
   }
 
-  if (ts.isLiteralExpression(expr)) {
+  if (ts.isLiteralExpression(expr)
+    || expr.kind === K.TrueKeyword
+    || expr.kind === K.FalseKeyword
+    || expr.kind === K.UndefinedKeyword
+    || expr.kind === K.NullKeyword) {
     return true
   }
 
@@ -80,9 +87,9 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
   const pkg = finder(path.dirname(src.fileName)).next().value
 
   function evalExp(node: ts.Node) {
-    (cmp.comptime.pkg as any) = pkg
+    (comptime.pkg as any) = pkg
     try {
-      var res = se(node.getText(), {comptime: cmp.comptime})
+      var res = se(node.getText(), {comptime: comptime})
       return res
     } catch (e) {
       console.error(e)
@@ -90,6 +97,11 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
   }
 
   function visit(node: ts.Node): ts.Node {
+
+    if (ts.isImportDeclaration(node) && node.moduleSpecifier.getText().slice(1, -1) === 'comptime') {
+      // Remove all references to import 'comptime'
+      return ts.createNotEmittedStatement(node)
+    }
 
     // Check if the expression is comptime and substitute its value
     if (ts.isPropertyAccessExpression(node)
@@ -99,10 +111,16 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
       || ts.isConditionalExpression(node)) {
 
       // This is where we replace the call / whatever
+      // console.log(`? ${node.getText()}`)
       if (expressionIsComptime(node, chk)) {
+        // console.log(`eval ${node.getText()}`)
         const res = evalExp(node)
-        // console.log('--', typeof res, res, node.getText())
-        if (res == undefined)
+
+        // If the expression was an assignement, remove it from the source entirely.
+        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken)
+          return ts.createNotEmittedStatement(node)
+
+        if (res == undefined || typeof res === 'boolean')
           return ts.createIdentifier('' + res)
         return ts.createLiteral(res)
       }
@@ -134,10 +152,6 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
         return visitall(node.whenFalse)
       }
     }
-
-    // FIXME : Maybe check switch statements ?
-
-    // console.log(node.getText(), nodeName(node.parent))
 
     return visitall(node)
   }
