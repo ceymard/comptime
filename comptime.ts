@@ -1,7 +1,6 @@
 
 import * as ts from 'typescript'
 import * as path from 'path'
-import * as finder from 'find-package-json'
 const se = require('safe-eval')
 
 const K = ts.SyntaxKind
@@ -10,7 +9,6 @@ const DECL_FILEDTS = path.join(__dirname, 'index.d.ts')
 
 const Comptime = {
   Env: {},
-  Pkg: {},
   Production: true,
   Dev: false,
   Debug: false
@@ -46,15 +44,12 @@ function nodeName(node: ts.Node) {
  */
 function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: ts.TypeChecker, options: PluginOptions) {
 
-  const pkg = finder(path.dirname(src.fileName)).next().value
-
   /**
    * Evaluate a compile-time expression, running it in a sandbox.
    * @param node the comptime expression
    */
   function evalExp(node: ts.Node) {
 
-    (Comptime.Pkg as any) = pkg
     const opts = Object.assign({}, ctx.getCompilerOptions(), {noImplicitUseString: true})
     var t = ts.transpile(node.getText(), opts).replace(/"use strict";\s*\n?/, '');
     try {

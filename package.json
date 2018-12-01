@@ -7,11 +7,9 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/find-package-json": "^1.1.0",
     "@types/node": "^10.12.10"
   },
   "dependencies": {
-    "find-package-json": "^1.1.0",
     "safe-eval": "^0.4.1"
   }
 }

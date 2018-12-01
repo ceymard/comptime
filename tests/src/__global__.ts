@@ -1,6 +1,6 @@
-import 'comptime'
+import { Comptime } from 'comptime'
 
-declare global {
+declare module 'comptime' {
   namespace Comptime {
     export function Test(a: number): string
   }

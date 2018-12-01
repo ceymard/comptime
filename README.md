@@ -6,6 +6,8 @@ Note that this plugin is still in a pretty alpha state and will crash on you the
 
 The documentation here is pretty minimal for now and will be supplemented at a later time. Please just know that there are probably many cave-at that you should be aware of that I didn't have time to detail here.
 
+Note that by design, if you compile without the plugin, the code will have *everything* included (all the ifs and whatnot) and will run like if `Production` is `true` and `Env` is an empty object.
+
 ## What it allows you to do
 
  * Conditionally compile code
@@ -52,13 +54,15 @@ The simplest way to use it is in conjunction with [ttypescript](https://github.c
 
 There is no need to configure your IDE to use something else than the normal typescript language server ; this plugin affects only the emitted code.
 
-Once loaded, `require 'comptime'` somewhere in your code to be able to start using it. Once required, it will pollute your global scope with a `Comptime` variable that holds at least `Comptime.Env` and `Comptime.Pkg`, where `Env` is a dictionary with the current compiler's environment variables, and `Pkg` is the `package.json` object that the current source file relates to.
+
 
 ## Conditions
 
 Compile-time expressions are those using only values from the `comptime` namespace or literals (strings, booleans, ...).
 
 ```typescript
+import { Comptime } from 'comptime'
+
 if (Comptime.Env.NODE_ENV === 'production') {
   // do things here
 } else if (Comptime.Env['NODE_ENV'] === 'dev') {
@@ -70,19 +74,12 @@ export const MY_VAR = Comptime.Env.NODE_ENV === 'production' ? 'prod-value' : 'd
 
 ## Default flags and environment variable
 
-You may use the `COMPTIME_ENV` environment variable as 'production' or 'dev', which will set `Comptime.Dev` and `Comptime.Production` boolean values accordingly.
+You have the following starting variables to play with :
 
-The `DEBUG` environment variable sets the `Comptime.Debug` flag if set to a non empty value and sets `Comptime.Dev` to `true` and `Comptime.Production` to `false`.
-
-These are the only variables that comptime sets for you.
-
-All in all, you have the following variables to play with :
-
- * `Comptime.Production` defaults to `false`
- * `Comptime.Dev` defaults to `true`
- * `Comptime.Debug` defaults to `false`
+ * `Comptime.Production` defaults to `true`, is `false` if `COMPTIME_ENV=dev`
+ * `Comptime.Dev` defaults to `false`, is `true` if `COMPTIME_ENV=dev` or if `DEBUG=<anything>`
+ * `Comptime.Debug` defaults to `false`, is `true` if `DEBUG` is set
  * `Comptime.Env` is an object with your environment
- * `Comptime.Pkg` is the current file's relative `package.json`
 
 ## Creating your own variables
 
@@ -90,9 +87,9 @@ In your code and in a file that you are sure will be loaded first by typescript 
 
 ```typescript
 // to have the global comptime namespace here
-import 'comptime'
+import { Comptime } from 'comptime'
 
-declare global {
+declare module 'comptime' {
   namespace Comptime {
     // We declare new variables
     export function Test(a: number): string
