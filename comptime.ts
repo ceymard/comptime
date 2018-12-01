@@ -170,8 +170,12 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
 
       // This is where we replace the call / whatever
       // console.log(`? ${node.getText()}`)
-      if (isComp(node) && ! ts.isCallExpression(node.parent)) {
-        // console.log(`eval ${node.getText()}`)
+
+      if (isComp(node)
+        // We check here that the comptime expression is not the left hand of a function call.
+        // If we get here, it most likely means that a function call using a comptime value
+        // was calling non-comptime values.
+        && !(ts.isCallExpression(node.parent) && node.parent.arguments.length > 0 && node.parent.expression === node)) {
         const res = evalExp(node)
 
         // If the expression was an assignement, remove it from the source entirely.
