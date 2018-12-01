@@ -3,6 +3,7 @@ import * as ts from 'typescript'
 
 import * as cmp from './index'
 import * as path from 'path'
+import * as finder from 'find-package-json'
 const se = require('safe-eval')
 
 const DECL_FILE = path.join(__dirname, 'index.ts')
@@ -31,6 +32,8 @@ function nodeName(node: ts.Node) {
 }
 
 function expressionIsComptime(expr: ts.Node, chk: ts.TypeChecker): boolean {
+  // console.log('?? ' + nodeName(expr) + ' ' + expr.getText())
+
   if (ts.isPrefixUnaryExpression(expr)) {
     // Am I using ! or - with a comptime expression ?
     return expressionIsComptime(expr.operand, chk)
@@ -68,11 +71,14 @@ function expressionIsComptime(expr: ts.Node, chk: ts.TypeChecker): boolean {
     }
   }
 
+  // console.log('not found: ' + nodeName(expr), expr.getText())
+
   return false
 }
 
 
-function evalExp(node: ts.Node) {
+function evalExp(node: ts.Node, pkg: any) {
+  (cmp.comptime.pkg as any) = pkg
   try {
     var res = se(node.getText(), {comptime: cmp.comptime})
     return res
@@ -84,12 +90,14 @@ function evalExp(node: ts.Node) {
 
 
 function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: ts.TypeChecker, options: PluginOptions) {
+  const pkg = finder(path.dirname(src.fileName)).next().value
+
   function visit(node: ts.Node): ts.Node {
     if (ts.isIfStatement(node)) {
       var exp = node.expression
       // console.log(nodeName(exp), expressionIsComptime(exp, chk))
       if (expressionIsComptime(exp, chk)) {
-        if (evalExp(exp)) return visitall(node.thenStatement)
+        if (evalExp(exp, pkg)) return visitall(node.thenStatement)
         return ts.createNotEmittedStatement(node)
       }
       return node
@@ -102,8 +110,8 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
 
       // This is where we replace the call / whatever
       if (expressionIsComptime(node, chk)) {
-        const res = evalExp(node)
-        console.log('--', typeof res, res, node.getText())
+        const res = evalExp(node, pkg)
+        // console.log('--', typeof res, res, node.getText())
         if (res == undefined)
         return ts.createIdentifier('' + res)
         return ts.createLiteral(res)
