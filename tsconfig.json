@@ -11,7 +11,8 @@
     "rootDir": ".",
     "noStrictGenericChecks": true,
     "experimentalDecorators": true,
-    "lib": ["es6"]
+    "lib": ["es6"],
+    "types": ["node"]
   },
   "exclude": ["__dist__", "__build__", "tests"]
 }
