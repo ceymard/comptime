@@ -13,6 +13,6 @@
     "experimentalDecorators": true,
     "lib": ["es6"]
   },
-  "exclude": ["__dist__", "__build__"]
+  "exclude": ["__dist__", "__build__", "tests"]
 }
 
