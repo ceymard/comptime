@@ -86,9 +86,9 @@ You have the following starting variables to play with :
 In your code and in a file that you are sure will be loaded first by typescript (typically with a name that sorts before or in a file imported by pretty much everyone) :
 
 ```typescript
-// to have the global comptime namespace here
 import { Comptime } from 'comptime'
 
+// Module augmentation baby !
 declare module 'comptime' {
   namespace Comptime {
     // We declare new variables
