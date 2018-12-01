@@ -39,31 +39,46 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
    * @param node the comptime expression
    */
   function evalExp(node: ts.Node) {
+
     (comptime.pkg as any) = pkg
     const opts = Object.assign({}, ctx.getCompilerOptions(), {noImplicitUseString: true})
     var t = ts.transpile(node.getText(), opts).replace(/"use strict";\s*\n?/, '');
-    var res = se(t, { comptime })
+    try {
+      var res = se(t, { comptime })
+    } catch (e) {
+      console.log(`comptime error in ${src.fileName}:${node.pos}`)
+      throw e
+    }
     return res
+  }
+
+  function allAreComp(exprs: ts.NodeArray<ts.Node>) {
+    var len = exprs.length
+    for (var i = 0; i < len; i++) {
+      if (!isComp(exprs[i]))
+        return false
+    }
+    return true
   }
 
   /**
    * Check if a node represents an expression that can be evaluated at compile time.
    * @param expr the AST expression to check
    */
-  function expressionIsComptime(expr: ts.Node): boolean {
+  function isComp(expr: ts.Node): boolean {
     // console.log('?? ' + nodeName(expr) + ' ' + expr.getText())
 
     // This checks for `comptime.a ? .. : ..`
     if (ts.isConditionalExpression(expr)) {
-      return expressionIsComptime(expr.condition)
-        && expressionIsComptime(expr.whenFalse)
-        && expressionIsComptime(expr.whenTrue)
+      return isComp(expr.condition)
+        && isComp(expr.whenFalse)
+        && isComp(expr.whenTrue)
     }
 
     // This checks for `!comptime.whatever` and `-comptime.whatever`
     if (ts.isPrefixUnaryExpression(expr)) {
       // Am I using ! or - with a comptime expression ?
-      return expressionIsComptime(expr.operand)
+      return isComp(expr.operand)
     }
 
     // This checks for expressions like
@@ -75,19 +90,25 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
       || ts.isParenthesizedExpression(expr)
       ) {
       // Am I accessing a property on a comptime expression ?
-      return expressionIsComptime(expr.expression)
+      return isComp(expr.expression)
     }
 
     if (ts.isBinaryExpression(expr)) {
       // Are both comptime ?
-      return expressionIsComptime(expr.left) && expressionIsComptime(expr.right)
+      return isComp(expr.left) && isComp(expr.right)
     }
+
+    if (ts.isArrayLiteralExpression(expr)) {
+      return allAreComp(expr.elements)
+    }
+
+    // if (ts.isObjectLiteralExpression(expr)) {
+    //   return expr.properties.length === expr.properties.map(p => expressionIsComptime(p))
+    // }
 
     if (ts.isLiteralExpression(expr)
       || ts.isFunctionExpression(expr)
       || ts.isArrowFunction(expr)
-      || ts.isObjectLiteralElement(expr)
-      || ts.isArrayLiteralExpression(expr)
       || expr.kind === K.TrueKeyword
       || expr.kind === K.FalseKeyword
       || expr.kind === K.UndefinedKeyword
@@ -99,8 +120,8 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
     if (ts.isCallExpression(expr)) {
       // For a call to be comptime, we need the call expression and all the arguments
       // to all be comptime.
-      return expressionIsComptime(expr.expression)
-        && expr.arguments.filter(a => expressionIsComptime(a)).length === expr.arguments.length
+      return isComp(expr.expression)
+        && allAreComp(expr.arguments)
     }
 
     if (ts.isIdentifier(expr)) {
@@ -108,8 +129,9 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
       const sym = type.getSymbol()
       if (sym && sym.declarations.length > 0) {
         const f = sym.declarations[0].getSourceFile().fileName
-        if (expr.text === 'comptime' && (f === DECL_FILE || f === DECL_FILEDTS))
+        if (expr.text === 'comptime' && (f === DECL_FILE || f === DECL_FILEDTS)) {
           return true
+        }
       }
     }
 
@@ -134,7 +156,7 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
 
       // This is where we replace the call / whatever
       // console.log(`? ${node.getText()}`)
-      if (expressionIsComptime(node)) {
+      if (isComp(node) && ! ts.isCallExpression(node.parent)) {
         // console.log(`eval ${node.getText()}`)
         const res = evalExp(node)
 
@@ -156,7 +178,7 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
       // the result of the expression.
       // If there is no else statement and the condition is not valid, then
       // do not emit anything at all
-      if (expressionIsComptime(exp)) {
+      if (isComp(exp)) {
         if (evalExp(exp)) return visitall(node.thenStatement)
         if (node.elseStatement)
           return visitall(node.elseStatement)
@@ -169,7 +191,7 @@ function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: 
     // Here, we check only its condition part to rewrite the then / else portion just like
     // the if statement
     if (ts.isConditionalExpression(node)) {
-      if (expressionIsComptime(node.condition)) {
+      if (isComp(node.condition)) {
         if (evalExp(node.condition))
           return visitall(node.whenTrue)
         return visitall(node.whenFalse)
