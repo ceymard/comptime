@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "declaration": true,
+    "sourceMap": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "outDir": "./lib",
+    "rootDir": "./src",
+    "noStrictGenericChecks": true,
+    "experimentalDecorators": true,
+    "lib": ["es6", "dom"],
+    "plugins": [
+      { "transform": "comptime/comptime" }
+    ]
+  },
+  "exclude": ["lib", "preproc"]
+}
+

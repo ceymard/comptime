@@ -9,19 +9,7 @@ const se = require('safe-eval')
 const DECL_FILE = path.join(__dirname, 'index.ts')
 const DECL_FILEDTS = path.join(__dirname, 'index.d.ts')
 
-const K = ts.SyntaxKind
-
 Object.assign(cmp.comptime.env, process.env)
-
-// Où signature est la signature d'une fonction, pour être sûrs qu'on récupère bien un
-// type déclaré par le bon script.
-// path.resolve(signature.declaration.getSourceFile().fileName) === path.resolve(path.join(__dirname, '..', '..', 'index.d.ts'))
-
-export namespace Comptime {
-  export declare const env: {[name: string]: string | undefined}
-
-}
-
 
 export interface PluginOptions {
 
@@ -33,6 +21,12 @@ function nodeName(node: ts.Node) {
 
 function expressionIsComptime(expr: ts.Node, chk: ts.TypeChecker): boolean {
   // console.log('?? ' + nodeName(expr) + ' ' + expr.getText())
+
+  if (ts.isConditionalExpression(expr)) {
+    return expressionIsComptime(expr.condition, chk)
+      && expressionIsComptime(expr.whenFalse, chk)
+      && expressionIsComptime(expr.whenTrue, chk)
+  }
 
   if (ts.isPrefixUnaryExpression(expr)) {
     // Am I using ! or - with a comptime expression ?
@@ -57,6 +51,8 @@ function expressionIsComptime(expr: ts.Node, chk: ts.TypeChecker): boolean {
   }
 
   if (ts.isCallExpression(expr)) {
+    // For a call to be comptime, we need the call expression and all the arguments
+    // to all be comptime.
     return expressionIsComptime(expr.expression, chk)
       && expr.arguments.filter(a => expressionIsComptime(a, chk)).length === expr.arguments.length
   }
@@ -77,47 +73,70 @@ function expressionIsComptime(expr: ts.Node, chk: ts.TypeChecker): boolean {
 }
 
 
-function evalExp(node: ts.Node, pkg: any) {
-  (cmp.comptime.pkg as any) = pkg
-  try {
-    var res = se(node.getText(), {comptime: cmp.comptime})
-    return res
-  } catch (e) {
-    console.error(e)
-    // ???
-  }
-}
 
 
 function visitorFactory(src: ts.SourceFile, ctx: ts.TransformationContext, chk: ts.TypeChecker, options: PluginOptions) {
+
   const pkg = finder(path.dirname(src.fileName)).next().value
 
-  function visit(node: ts.Node): ts.Node {
-    if (ts.isIfStatement(node)) {
-      var exp = node.expression
-      // console.log(nodeName(exp), expressionIsComptime(exp, chk))
-      if (expressionIsComptime(exp, chk)) {
-        if (evalExp(exp, pkg)) return visitall(node.thenStatement)
-        return ts.createNotEmittedStatement(node)
-      }
-      return node
+  function evalExp(node: ts.Node) {
+    (cmp.comptime.pkg as any) = pkg
+    try {
+      var res = se(node.getText(), {comptime: cmp.comptime})
+      return res
+    } catch (e) {
+      console.error(e)
     }
+  }
 
+  function visit(node: ts.Node): ts.Node {
+
+    // Check if the expression is comptime and substitute its value
     if (ts.isPropertyAccessExpression(node)
       || ts.isElementAccessExpression(node)
       || ts.isCallExpression(node)
-      || ts.isBinaryExpression(node)) {
+      || ts.isBinaryExpression(node)
+      || ts.isConditionalExpression(node)) {
 
       // This is where we replace the call / whatever
       if (expressionIsComptime(node, chk)) {
-        const res = evalExp(node, pkg)
+        const res = evalExp(node)
         // console.log('--', typeof res, res, node.getText())
         if (res == undefined)
-        return ts.createIdentifier('' + res)
+          return ts.createIdentifier('' + res)
         return ts.createLiteral(res)
-        // console.log(res)
       }
     }
+
+    if (ts.isIfStatement(node)) {
+      var exp = node.expression
+
+      // If the if statement is resolvable at compile time, then evaluate
+      // it and return either the `then` or `else` statement depending on
+      // the result of the expression.
+      // If there is no else statement and the condition is not valid, then
+      // do not emit anything at all
+      if (expressionIsComptime(exp, chk)) {
+        if (evalExp(exp)) return visitall(node.thenStatement)
+        if (node.elseStatement)
+          return visitall(node.elseStatement)
+        return ts.createNotEmittedStatement(node)
+      }
+    }
+
+    // We checked above that the conditional expression was not itself fully comptime.
+    // Here, we check only its condition part to rewrite the then / else portion just like
+    // the if statement
+    if (ts.isConditionalExpression(node)) {
+      if (expressionIsComptime(node.condition, chk)) {
+        if (evalExp(node.condition))
+          return visitall(node.whenTrue)
+        return visitall(node.whenFalse)
+      }
+    }
+
+    // FIXME : Maybe check switch statements ?
+
     // console.log(node.getText(), nodeName(node.parent))
 
     return visitall(node)

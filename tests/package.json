@@ -1,0 +1,22 @@
+{
+  "name": "comptime-test",
+  "version": "0.0.1",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "ttsc"
+  },
+  "workspaces": [
+    "../"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ttypescript": "^1.5.5",
+    "typescript": "^3.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^10.12.10"
+  }
+}
