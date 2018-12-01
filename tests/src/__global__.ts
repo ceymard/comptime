@@ -8,6 +8,6 @@ declare global {
   }
 }
 
-comptime.debug = true
-comptime.prod = false
+comptime.debug = !!comptime.env.DEBUG
+comptime.prod = !comptime.debug
 comptime.test = function (a: number) { return '' + a + 3 }
